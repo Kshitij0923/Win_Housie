@@ -1,11 +1,14 @@
-import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sms_autofill/sms_autofill.dart';
+import 'package:tambola/Provider/Controller/api_provider.dart';
+import 'package:tambola/Screens/Admin%20Screens/admin_dashboard.dart';
 import 'package:tambola/Screens/home_page.dart';
 import 'package:tambola/Theme/app_theme.dart';
 
@@ -158,80 +161,54 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     setState(() => _isLoading = true);
     final otp = _otpControllers.map((controller) => controller.text).join();
 
-    try {
-      debugPrint('\n=== OTP Verification Request ===');
-      debugPrint('Sending verification request with data:');
-      debugPrint('Phone: ${widget.phoneNumber}');
-      debugPrint('OTP: $otp');
-      debugPrint('Username: ${widget.username}');
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      final response = await http.post(
-        Uri.parse('https://app.houziee.in/api/auth/verify-otp'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'phone': widget.phoneNumber,
-          'otp': otp,
-          'name': widget.username,
-        }),
+    final result = await authProvider.verifyOtpRequest(
+      phone: widget.phoneNumber,
+      otp: otp,
+      name: widget.username,
+    );
+
+    if (result['success']) {
+      final data = result['data'];
+      final userData = data['user'];
+      final accessToken = data['accessToken'];
+
+      await saveUserData(
+        phoneNumber: userData['phone'].toString(),
+        username: userData['name'].toString(),
+        authToken: accessToken.toString(),
       );
 
-      debugPrint('Response status code: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
+      // Check user role
+      final role = userData['role']; // Assuming 'role' is in the user data
+      debugPrint('User Role: $role');
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        debugPrint('Decoded response data: $responseData');
+      if (mounted) {
+        await Future.delayed(const Duration(milliseconds: 300));
 
-        final authToken = responseData['token'];
-        final userData = responseData['user'];
-
-        if (authToken == null || userData == null) {
-          throw Exception('Invalid response format');
-        }
-
-        final userId = userData['id']?.toString();
-        if (userId == null) {
-          throw Exception('User ID missing in response');
-        }
-
-        debugPrint('Saving user data:');
-        debugPrint('User ID: $userId');
-        debugPrint('Username: ${userData['name']}');
-        debugPrint('Phone: ${userData['phone']}');
-
-        await saveUserData(
-          phoneNumber: userData['phone'],
-          username: userData['name'],
-          authToken: authToken,
-          userId: userId,
-        );
-
-        debugPrint(
-          "Data saved. Phone: ${userData['phone']} | Username: ${userData['name']}",
-        );
-
-        if (mounted) {
-          await Future.delayed(const Duration(milliseconds: 300));
-          // Navigate to home screen
+        // Navigate based on the role
+        if (role == 'admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => AdminDashboard()),
+          );
+        } else {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => HousieeGameApp()),
           );
+          debugPrint('Unknown user role: $e');
         }
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Verification failed');
       }
-    } catch (e) {
-      debugPrint('Verification error: $e');
+    } else {
       if (mounted) {
-        _showErrorSnackBar('Verification failed: ${e.toString()}');
+        _showErrorSnackBar(result['message'] ?? 'Verification failed');
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-      debugPrint('=== OTP Verification End ===\n');
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -252,7 +229,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     required String phoneNumber,
     required String username,
     required String authToken,
-    required String userId,
+    //required String userId,
   }) async {
     await _initPrefs();
 
@@ -291,26 +268,17 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
 
     _startResendTimer();
 
-    try {
-      final response = await http.post(
-        Uri.parse('https://app.houziee.in/api/auth/send-otp'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'name': widget.username,
-          'phone': widget.phoneNumber,
-        }),
-      );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final result = await authProvider.resendOtp(
+      phone: widget.phoneNumber,
+      name: widget.username,
+    );
 
-      if (response.statusCode == 200) {
-        _showSuccessSnackBar('OTP sent successfully!');
-        // Reset the SMS listener after resend
-        await initSmsListener();
-      } else {
-        final errorData = json.decode(response.body);
-        _showErrorSnackBar(errorData['error'] ?? 'Failed to resend OTP');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Network error. Please check your connection.');
+    if (result['success']) {
+      _showSuccessSnackBar(result['message'] ?? 'OTP resent!');
+      await initSmsListener();
+    } else {
+      _showErrorSnackBar(result['message'] ?? 'Failed to resend OTP');
     }
   }
 

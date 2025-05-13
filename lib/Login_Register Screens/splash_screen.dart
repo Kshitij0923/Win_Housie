@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tambola/Custom%20Loader/loading_animation.dart';
+import 'package:tambola/Custom%20Widgets/loading_animation.dart';
 import 'package:tambola/Login_Register%20Screens/start_page.dart';
 import 'dart:math' as math;
 

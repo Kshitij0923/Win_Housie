@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:tambola/Custom%20Widgets/button_style.dart';
 import 'dart:math';
 import 'package:tambola/Login_Register%20Screens/register_screen.dart';
 import 'package:tambola/Theme/app_theme.dart';
@@ -9,23 +10,22 @@ class StartPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final theme = AppTheme();
+    theme.init(context);
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(gradient: AppTheme().backgroundGradient),
         child: SafeArea(
           child: Stack(
             children: [
-              // Background animations
               const Positioned.fill(child: AnimatedBackground()),
               // Main content
               Column(
                 children: [
-                  SizedBox(height: screenHeight * 0.08),
+                  SizedBox(height: theme.sp(5)),
                   // Logo and Title with animation
                   const LogoWithAnimation(),
-                  SizedBox(height: screenHeight * 0.04),
+                  SizedBox(height: theme.sp(1)),
                   // Stack with ticket and play button
                   Expanded(
                     child: Stack(
@@ -33,13 +33,23 @@ class StartPage extends StatelessWidget {
                       children: [
                         // Animated ticket section
                         Positioned(
-                          bottom: screenWidth * 0.24,
+                          bottom: theme.sp(20),
                           child: const EnhancedHousieTicket(),
                         ),
                         // Play button positioned on top of ticket
                         Positioned(
-                          bottom: screenWidth * 0.03,
-                          child: PlayNowButton(context: context),
+                          bottom: theme.sp(1),
+                          child: ButtonWidget(
+                            label: 'Play Now',
+                            icon: Icons.casino_rounded,
+                            onPressed: () {
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -60,19 +70,15 @@ class StartPage extends StatelessWidget {
                         Icons.help_outline_rounded,
                         color: Colors.white70,
                       ),
-                      label: Text(
-                        'How to Play',
-                        style: TextStyle(
-                          fontSize: screenHeight * 0.018,
-                          color: Colors.white.withValues(alpha: 0.9),
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
+                      label: Text('How to Play', style: theme.captionStyle),
                     ),
                   ),
                   // Bottom buttons
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 20, top: 10),
+                    padding: EdgeInsets.only(
+                      bottom: theme.sp(20),
+                      top: theme.sp(20),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -170,6 +176,7 @@ class _LogoWithAnimationState extends State<LogoWithAnimation>
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppTheme();
     return Column(
       children: [
         // Animated logo
@@ -181,7 +188,7 @@ class _LogoWithAnimationState extends State<LogoWithAnimation>
               child: Transform.scale(
                 scale: _scaleAnimation.value,
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(theme.sp(5)),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF9D4EDD).withValues(alpha: 0.2),
@@ -195,7 +202,7 @@ class _LogoWithAnimationState extends State<LogoWithAnimation>
                   ),
                   child: Icon(
                     Icons.casino_rounded,
-                    size: 60,
+                    size: theme.sp(10),
                     color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
@@ -203,24 +210,17 @@ class _LogoWithAnimationState extends State<LogoWithAnimation>
             );
           },
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: theme.sp(3)),
         // Title with shimmer effect
         ShimmerText(
           text: 'Win Housie',
-          style: const TextStyle(
-            fontSize: 38,
+          style: theme.headingStyle.copyWith(
+            fontSize: theme.sp(8.5),
             fontWeight: FontWeight.bold,
-            letterSpacing: 3.0,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'The Ultimate Housie Game',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.white.withValues(alpha: 0.8),
-          ),
-        ),
+        SizedBox(height: theme.sp(1)),
+        Text('The Ultimate Housie Game', style: theme.captionStyle),
       ],
     );
   }
@@ -230,8 +230,7 @@ class _LogoWithAnimationState extends State<LogoWithAnimation>
 class ShimmerText extends StatefulWidget {
   final String text;
   final TextStyle style;
-  const ShimmerText({Key? key, required this.text, required this.style})
-    : super(key: key);
+  const ShimmerText({super.key, required this.text, required this.style});
 
   @override
   State<ShimmerText> createState() => _ShimmerTextState();
@@ -291,7 +290,7 @@ class _ShimmerTextState extends State<ShimmerText>
 
 // Animated background with particles
 class AnimatedBackground extends StatefulWidget {
-  const AnimatedBackground({Key? key}) : super(key: key);
+  const AnimatedBackground({super.key});
 
   @override
   State<AnimatedBackground> createState() => _AnimatedBackgroundState();
@@ -412,7 +411,7 @@ class ParticlesPainter extends CustomPainter {
 
 // Enhanced Housie Ticket with better animations and modern design
 class EnhancedHousieTicket extends StatefulWidget {
-  const EnhancedHousieTicket({Key? key}) : super(key: key);
+  const EnhancedHousieTicket({super.key});
 
   @override
   State<EnhancedHousieTicket> createState() => _EnhancedHousieTicketState();
@@ -749,159 +748,16 @@ class _EnhancedHousieTicketState extends State<EnhancedHousieTicket>
 }
 
 // Animated Play Now Button
-class PlayNowButton extends StatefulWidget {
-  final BuildContext context;
-  const PlayNowButton({Key? key, required this.context}) : super(key: key);
-
-  @override
-  State<PlayNowButton> createState() => _PlayNowButtonState();
-}
-
-class _PlayNowButtonState extends State<PlayNowButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _glowAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.08,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-    _glowAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnimation.value,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(
-                    0xFF9D4EDD,
-                  ).withValues(alpha: 0.3 + 0.3 * _glowAnimation.value),
-                  blurRadius: 20,
-                  spreadRadius: 4 * _glowAnimation.value,
-                ),
-              ],
-            ),
-            child: ElevatedButton(
-              onPressed: () {
-                HapticFeedback.heavyImpact();
-                Navigator.of(context).pushReplacement(
-                  PageRouteBuilder(
-                    transitionDuration: const Duration(milliseconds: 800),
-                    pageBuilder:
-                        (_, animation, secondaryAnimation) =>
-                            const RegisterScreen(),
-                    transitionsBuilder: (_, animation, __, child) {
-                      return Stack(
-                        children: [
-                          // Background flash animation
-                          FadeTransition(
-                            opacity: Tween<double>(
-                              begin: 0.0,
-                              end: 0.3,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: const Interval(0.0, 0.4),
-                              ),
-                            ),
-                            child: Container(color: const Color(0xFF9D4EDD)),
-                          ),
-                          // Content slide and fade animation
-                          SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0.0, 0.5),
-                              end: Offset.zero,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOutCubic,
-                              ),
-                            ),
-                            child: FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF9D4EDD),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 50,
-                  vertical: 18,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                elevation: 5 + 5 * _glowAnimation.value,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'PLAY NOW',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Transform.rotate(
-                    angle: _controller.value * 0.5 * pi,
-                    child: const Icon(
-                      Icons.casino_rounded,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
 
 // Animated Icon Button for bottom navigation
 class AnimatedIconButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback onPressed;
   const AnimatedIconButton({
-    Key? key,
+    super.key,
     required this.icon,
     required this.onPressed,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedIconButton> createState() => _AnimatedIconButtonState();
@@ -1003,7 +859,7 @@ class GridPainter extends CustomPainter {
 
 // How to Play Bottom Sheet
 class HowToPlaySheet extends StatelessWidget {
-  const HowToPlaySheet({Key? key}) : super(key: key);
+  const HowToPlaySheet({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1100,11 +956,11 @@ class RuleItem extends StatelessWidget {
   final String title;
   final String description;
   const RuleItem({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.description,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1153,7 +1009,7 @@ class RuleItem extends StatelessWidget {
 
 // Settings Dialog
 class SettingsDialog extends StatefulWidget {
-  const SettingsDialog({Key? key}) : super(key: key);
+  const SettingsDialog({super.key});
 
   @override
   State<SettingsDialog> createState() => _SettingsDialogState();
@@ -1321,12 +1177,12 @@ class SettingsSwitchTile extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
   const SettingsSwitchTile({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.value,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

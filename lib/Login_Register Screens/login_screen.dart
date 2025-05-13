@@ -1,11 +1,11 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
+import 'package:provider/provider.dart';
 import 'package:tambola/Login_Register%20Screens/otp_verification_screen.dart';
 import 'package:tambola/Login_Register%20Screens/register_screen.dart';
 import 'package:tambola/Login_Register%20Screens/start_page.dart';
+import 'package:tambola/Provider/Controller/api_provider.dart';
 import 'package:tambola/Theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -71,25 +71,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     String phoneNumber = _phoneController.text;
     if (!phoneNumber.startsWith('+91')) {
-      phoneNumber = '+91$phoneNumber';
+      phoneNumber = phoneNumber;
     }
 
     try {
       debugPrint('\n=== Login Request ===');
       debugPrint('Sending login request with phone: $phoneNumber');
 
-      final response = await http.post(
-        Uri.parse('https://app.houziee.in/api/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'phone': phoneNumber}),
-      );
+      final provider = Provider.of<AuthProvider>(context, listen: false);
+      final result = await provider.loginUser(phone: phoneNumber);
 
-      debugPrint('Response status code: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (result['success']) {
         if (mounted) {
-          // Navigate to OTP verification screen
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -97,14 +90,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   (context) => OtpVerificationScreen(
                     phoneNumber: phoneNumber,
                     username: '', // No username needed for login
-                    // isLogin: true, // Flag to indicate this is a login flow
                   ),
             ),
           );
         }
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Login failed');
+        _showErrorSnackBar(result['message']);
       }
     } catch (e) {
       debugPrint('Login error: $e');

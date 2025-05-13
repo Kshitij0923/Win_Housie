@@ -1,11 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
+import 'package:provider/provider.dart';
 import 'package:tambola/Login_Register%20Screens/login_screen.dart';
 import 'package:tambola/Login_Register%20Screens/otp_verification_screen.dart';
 import 'package:tambola/Login_Register%20Screens/start_page.dart';
+import 'package:tambola/Provider/Controller/api_provider.dart';
+import 'package:tambola/Theme/app_theme.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -26,13 +27,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _referralFocus = FocusNode();
 
-  // Form state variables
   bool _isLoading = false;
   bool _isOver18 = false;
   bool _acceptTerms = false;
   bool _isFormValid = false;
 
-  // Colors - Enhanced color scheme for better harmony
   final Color _primaryColor = const Color(0xFF6C63FF); // Main purple
   final Color _accentColor = const Color(0xFFFF6584); // Pink accent
   final Color _backgroundColor = const Color(0xFF121212); // Dark background
@@ -58,7 +57,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    // Add listeners to check form validity
     _usernameController.addListener(_checkFormValidity);
     _phoneController.addListener(_checkFormValidity);
     _emailController.addListener(_checkFormValidity);
@@ -86,7 +84,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _usernameController.text.isNotEmpty &&
         _phoneController.text.isNotEmpty &&
         _emailController.text.isNotEmpty &&
-        _isOver18 &&
         _acceptTerms;
 
     setState(() {
@@ -106,7 +103,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     String phoneNumber = _phoneController.text;
     if (!phoneNumber.startsWith('+91')) {
-      phoneNumber = '+91$phoneNumber';
+      phoneNumber = phoneNumber;
     }
 
     try {
@@ -117,25 +114,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint('Email: ${_emailController.text}');
       debugPrint('Referral: ${_referralController.text}');
 
-      final response = await http.post(
-        Uri.parse(
-          'https://ae79-103-175-140-106.ngrok-free.app/api/authenticate/createuser',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': _usernameController.text,
-          'phone': phoneNumber,
-          'email': _emailController.text,
-          'referral_code': _referralController.text,
-        }),
+      final provider = Provider.of<AuthProvider>(context, listen: false);
+      final result = await provider.registerUser(
+        name: _usernameController.text,
+        phone: phoneNumber,
+        email: _emailController.text,
+        referralCode: _referralController.text,
       );
 
-      debugPrint('Response status code: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (result['success']) {
         if (mounted) {
-          // Navigate to OTP verification screen
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -148,8 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           );
         }
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Registration failed');
+        _showErrorSnackBar(result['message']);
       }
     } catch (e) {
       debugPrint('Registration error: $e');
@@ -230,9 +217,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.of(context).size.height;
-    final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-
+    final theme = AppTheme();
+    theme.init(context);
     return Scaffold(
       backgroundColor: _backgroundColor,
       extendBodyBehindAppBar: true,
@@ -256,10 +242,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         title: Text(
           "Create Account",
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+          style: theme.headingStyle.copyWith(
             color: _textPrimaryColor,
+            fontSize: theme.sp(5.5),
           ),
         ),
       ),
@@ -268,27 +253,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
           child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.black, Colors.black87, Colors.deepPurple],
-              ),
-            ),
+            decoration: BoxDecoration(gradient: theme.backgroundGradient),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: Padding(
                 padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  bottom: keyboardHeight > 0 ? keyboardHeight : 20,
+                  left: theme.wp(5),
+                  right: theme.wp(5),
+                  bottom: theme.sp(10) > 0 ? theme.sp(20) : 20,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SizedBox(height: screenHeight * 0.05),
-
-                    // Enhanced animation container
+                    SizedBox(height: theme.sp(10)),
                     Stack(
                       children: [
                         // Subtle gradient for animation background
@@ -307,7 +284,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         // Subtle overlay to enhance animation visibility
                         Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(theme.sp(20)),
                             gradient: RadialGradient(
                               center: Alignment.center,
                               radius: 1.0,
@@ -321,7 +298,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ],
                     ),
 
-                    SizedBox(height: screenHeight * 0.03),
+                    SizedBox(height: theme.sp(20)),
 
                     // Enhanced Title with gradient
                     ShaderMask(
@@ -334,27 +311,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ).createShader(bounds),
-                      child: Text(
-                        "Win Housie",
-                        style: GoogleFonts.poppins(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: Text("Win Housie", style: theme.headingStyle),
                     ),
                     SizedBox(height: 10),
-
-                    // Subtitle
                     Text(
                       "Create an account to start playing!",
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: _textSecondaryColor,
-                      ),
+                      style: theme.captionStyle,
                     ),
-                    SizedBox(height: screenHeight * 0.04),
+                    SizedBox(height: theme.sp(10)),
 
                     // Form fields with enhanced spacing
                     _buildTextField(
@@ -364,7 +329,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       focusNode: _usernameFocus,
                       nextFocus: _phoneFocus,
                     ),
-                    SizedBox(height: 18),
+                    SizedBox(height: theme.sp(5)),
                     _buildTextField(
                       hintText: "Phone Number",
                       icon: Icons.phone,
@@ -373,7 +338,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       nextFocus: _emailFocus,
                       keyboardType: TextInputType.phone,
                     ),
-                    SizedBox(height: 18),
+                    SizedBox(height: theme.sp(5)),
                     _buildTextField(
                       hintText: "Email Address",
                       icon: Icons.email_outlined,
@@ -382,7 +347,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       nextFocus: _referralFocus,
                       keyboardType: TextInputType.emailAddress,
                     ),
-                    SizedBox(height: 18),
+                    SizedBox(height: theme.sp(5)),
                     _buildTextField(
                       hintText: "Referral Code (Optional)",
                       icon: Icons.card_giftcard,
@@ -390,132 +355,109 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       focusNode: _referralFocus,
                       textInputAction: TextInputAction.done,
                     ),
-                    SizedBox(height: 28),
+                    SizedBox(height: theme.sp(5)),
 
                     // Enhanced Checkboxes
-                    Theme(
-                      data: ThemeData(
-                        checkboxTheme: CheckboxThemeData(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                    Container(
+                      padding: EdgeInsets.all(theme.sp(3.5)),
+                      decoration: BoxDecoration(
+                        color: _cardColor,
+                        borderRadius: BorderRadius.circular(theme.sp(3)),
+                        border: Border.all(
+                          color: _textSecondaryColor.withValues(alpha: 0.1),
+                          width: theme.sp(0.5),
                         ),
                       ),
-                      child: Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: _cardColor,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _textSecondaryColor.withValues(alpha: 0.1),
-                            width: 1,
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Transform.scale(
+                                scale: 1.1,
+                                child: Checkbox(
+                                  value: _isOver18,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _isOver18 = value ?? false;
+                                      _checkFormValidity();
+                                    });
+                                  },
+                                  activeColor: _primaryColor,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  "I confirm that I am 18 years or older",
+                                  style: theme.captionStyle.copyWith(
+                                    fontSize: theme.wp(3.5),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Transform.scale(
-                                  scale: 1.1,
-                                  child: Checkbox(
-                                    value: _isOver18,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _isOver18 = value ?? false;
-                                        _checkFormValidity();
-                                      });
-                                    },
-                                    activeColor: _primaryColor,
-                                  ),
+                          SizedBox(height: theme.sp(1)),
+                          Row(
+                            children: [
+                              Transform.scale(
+                                scale: 1.1,
+                                child: Checkbox(
+                                  value: _acceptTerms,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _acceptTerms = value ?? false;
+                                      _checkFormValidity();
+                                    });
+                                  },
+                                  activeColor: _primaryColor,
                                 ),
-                                Expanded(
-                                  child: Text(
-                                    "I confirm that I am 18 years or older",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: _textSecondaryColor,
+                              ),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    text: "I agree to the ",
+                                    style: theme.captionStyle.copyWith(
+                                      fontSize: theme.wp(3.5),
                                     ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Transform.scale(
-                                  scale: 1.1,
-                                  child: Checkbox(
-                                    value: _acceptTerms,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _acceptTerms = value ?? false;
-                                        _checkFormValidity();
-                                      });
-                                    },
-                                    activeColor: _primaryColor,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: RichText(
-                                    text: TextSpan(
-                                      text: "I agree to the ",
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        color: _textSecondaryColor,
-                                      ),
-                                      children: [
-                                        TextSpan(
-                                          text: "Terms & Conditions",
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: _primaryColor,
-                                          ),
+                                    children: [
+                                      TextSpan(
+                                        text: "Terms & Conditions",
+                                        style: theme.captionStyle.copyWith(
+                                          fontSize: theme.wp(3.5),
+                                          color: _accentColor,
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 32),
+                    SizedBox(height: theme.sp(7)),
 
                     // Enhanced Register button
                     Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
+                        borderRadius: BorderRadius.circular(theme.sp(5)),
                         boxShadow: [
                           BoxShadow(
                             color: _primaryColor.withValues(alpha: 0.3),
-                            blurRadius: 15,
+                            blurRadius: theme.sp(5),
                             offset: const Offset(0, 5),
                             spreadRadius: 0,
                           ),
                         ],
                       ),
-                      width: double.infinity,
-                      height: 55,
+                      width: theme.wp(40),
+                      height: theme.sp(13.4),
                       child: Container(
                         decoration: BoxDecoration(
                           gradient:
                               _isLoading || !_isFormValid
-                                  ? LinearGradient(
-                                    // disabled gradient (optional)
-                                    colors: [
-                                      Colors.grey.shade800,
-                                      Colors.grey.shade600,
-                                    ],
-                                  )
-                                  : const LinearGradient(
-                                    colors: [
-                                      Color(0xFF6C63FF), // _primaryColor
-                                      Color(0xFFFF6584), // _accentColor
-                                    ],
-                                  ),
+                                  ? theme.disabledGradient
+                                  : theme.primaryGradient,
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: ElevatedButton(
@@ -525,38 +467,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: EdgeInsets.symmetric(
+                              vertical: theme.sp(2),
+                            ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
+                              borderRadius: BorderRadius.circular(theme.sp(20)),
                             ),
                           ),
                           child:
                               _isLoading
-                                  ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
+                                  ? SizedBox(
+                                    width: theme.sp(24),
+                                    height: theme.sp(24),
                                     child: CircularProgressIndicator(
-                                      color: Colors.white,
+                                      color: theme.textPrimaryColor,
                                       strokeWidth: 2,
                                     ),
                                   )
-                                  : Text(
-                                    "Register",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      color:
-                                          _isLoading || !_isFormValid
-                                              ? Colors.grey
-                                              : Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                  : Text("Register", style: theme.bodyStyle),
                         ),
                       ),
                     ),
-                    SizedBox(height: 24),
-
-                    // Login option with enhanced styling
+                    SizedBox(height: theme.sp(5)),
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -567,37 +499,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         );
                       },
                       child: Container(
-                        padding: EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 20,
-                        ),
                         decoration: BoxDecoration(
                           color: _cardColor.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(30),
+                          borderRadius: BorderRadius.circular(theme.sp(5)),
                         ),
                         child: RichText(
                           text: TextSpan(
                             text: "Already have an account? ",
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              color: _textSecondaryColor,
-                            ),
-
+                            style: theme.captionStyle,
                             children: [
-                              TextSpan(
-                                text: " Login",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: _accentColor,
-                                ),
-                              ),
+                              TextSpan(text: " Login", style: theme.linkStyle),
                             ],
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: 20),
+                    SizedBox(height: theme.sp(5)),
                   ],
                 ),
               ),

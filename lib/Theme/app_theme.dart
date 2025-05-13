@@ -77,6 +77,7 @@ class AppTheme {
   final Color successColor = const Color(0xFF4CAF50);
   final Color warningColor = const Color(0xFFFFC107);
   final Color infoColor = const Color(0xFF2196F3);
+  final Color buttonbackgroundColor = const Color(0xFF9D4EDD);
 
   // Gradients
   LinearGradient get primaryGradient => LinearGradient(
