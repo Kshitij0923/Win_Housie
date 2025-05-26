@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider with ChangeNotifier {
-  final String _baseUrl = 'https://d5c4-103-175-140-106.ngrok-free.app';
+  final String _baseUrl = 'https://ae12-103-175-140-106.ngrok-free.app';
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -197,9 +198,34 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  void logout() {
-    _accessToken = null;
-    _user = null;
-    notifyListeners();
+  Future<void> logout() async {
+    try {
+      // Clear in-memory data
+      _accessToken = null;
+      _user = null;
+
+      // Clear SharedPreferences data
+      final prefs = await SharedPreferences.getInstance();
+
+      // Remove all authentication-related data
+      await prefs.remove('isLoggedIn');
+      await prefs.remove('phone_number');
+      await prefs.remove('username');
+      await prefs.remove('auth_token');
+      await prefs.remove('refresh_token');
+      await prefs.remove('user_role');
+      await prefs.remove('user_id');
+
+      debugPrint('User logged out successfully - all data cleared');
+
+      // Notify listeners after clearing data
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error during logout: $e');
+      // Even if there's an error, clear in-memory data and notify
+      _accessToken = null;
+      _user = null;
+      notifyListeners();
+    }
   }
 }

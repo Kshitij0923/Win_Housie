@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tambola/Custom%20Widgets/loading_animation.dart';
+import 'package:tambola/Login_Register%20Screens/login_screen.dart';
 import 'package:tambola/Login_Register%20Screens/start_page.dart';
+import 'package:tambola/Screens/home_page.dart';
 import 'dart:math' as math;
 
 import 'package:tambola/Theme/app_theme.dart';
@@ -59,6 +62,30 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Manually control the loading progress
     _startLoadingAnimation();
+    checkLoginStatus();
+  }
+
+  Future<void> checkLoginStatus() async {
+    await Future.delayed(const Duration(seconds: 2)); // splash effect
+
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+    if (isLoggedIn) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) {
+            return const HousieeGameApp();
+          },
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+      );
+    }
   }
 
   void _startLoadingAnimation() async {

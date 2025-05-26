@@ -126,13 +126,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (mounted) {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder:
-                  (context) => OtpVerificationScreen(
-                    phoneNumber: phoneNumber,
-                    username: _usernameController.text,
-                  ),
-            ),
+            MaterialPageRoute(builder: (context) => LoginScreen()),
           );
         }
       } else {

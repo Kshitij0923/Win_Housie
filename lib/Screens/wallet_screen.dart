@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:tambola/Provider/Controller/user_provider.dart';
+import 'package:tambola/Provider/Controller/wallet_service.dart';
+import 'package:tambola/Provider/Modal/transaction_modal.dart';
+import 'package:tambola/Screens/transaction.dart';
 import 'package:tambola/Theme/app_theme.dart';
 
 class WalletScreen extends StatefulWidget {
-  final int coins;
-  final int tickets;
-  final List<Transaction> recentTransactions;
-
-  const WalletScreen({
-    super.key,
-    this.coins = 0,
-    this.tickets = 0,
-    this.recentTransactions = const [],
-  });
+  const WalletScreen({super.key});
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
@@ -22,12 +18,69 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _showBalance = true;
+  final WalletService _walletService = WalletService();
+
+  bool _isLoading = true;
+  int _coins = 0;
+  int _tickets = 0;
+  List<Transaction> _recentTransactions = [];
+  List<Ticket> _userTickets = [];
+  String _error = '';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _fetchWalletData();
+  }
+
+  Future<void> _fetchWalletData() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final token = userProvider.authToken;
+    debugPrint("Auth Token from UserProvider: $token");
+
+    if (token == null) {
+      setState(() {
+        _isLoading = false;
+        _error = 'User not authenticated. Please log in again.';
+      });
+      return;
+    }
+
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = '';
+      });
+
+      final walletData = await _walletService.fetchWalletData(token);
+
+      setState(() {
+        // Update UI with wallet data
+        _coins = walletData['coins'] ?? 0;
+        _tickets = walletData['tickets'] ?? 0;
+
+        if (walletData['transactions'] != null) {
+          _recentTransactions = _walletService.parseTransactions(
+            walletData['transactions'],
+          );
+        }
+
+        if (walletData['userTickets'] != null) {
+          _userTickets = _walletService.parseTickets(walletData['userTickets']);
+        }
+
+        _isLoading = false;
+      });
+
+      debugPrint('Wallet data fetched successfully. Balance: $_coins');
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Failed to load wallet data. Please try again.';
+      });
+      debugPrint('Error fetching wallet data: $e');
+    }
   }
 
   @override
@@ -49,32 +102,84 @@ class _WalletScreenState extends State<WalletScreen>
       body: Container(
         decoration: BoxDecoration(gradient: theme.backgroundGradient),
         child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAppBar(theme),
-              SizedBox(height: theme.hp(2)),
-              _buildWalletBalance(theme, baseColor, shadowDark, shadowLight),
-              SizedBox(height: theme.hp(3)),
-              _buildQuickActions(theme, baseColor, shadowDark, shadowLight),
-              SizedBox(height: theme.hp(3)),
-              _buildTabBar(theme),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildTransactionsTab(
-                      theme,
-                      baseColor,
-                      shadowDark,
-                      shadowLight,
+          child:
+              _isLoading
+                  ? Center(
+                    child: CircularProgressIndicator(color: theme.primaryColor),
+                  )
+                  : _error.isNotEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: theme.errorColor,
+                          size: theme.wp(15),
+                        ),
+                        SizedBox(height: theme.hp(2)),
+                        Text(
+                          _error,
+                          style: theme.bodyStyle,
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: theme.hp(3)),
+                        ElevatedButton(
+                          onPressed: _fetchWalletData,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: theme.wp(5),
+                              vertical: theme.hp(1.5),
+                            ),
+                          ),
+                          child: Text('Retry', style: theme.buttonTextStyle),
+                        ),
+                      ],
                     ),
-                    _buildTicketsTab(theme, baseColor, shadowDark, shadowLight),
-                  ],
-                ),
-              ),
-            ],
-          ),
+                  )
+                  : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildAppBar(theme),
+                      SizedBox(height: theme.hp(2)),
+                      _buildWalletBalance(
+                        theme,
+                        baseColor,
+                        shadowDark,
+                        shadowLight,
+                      ),
+                      SizedBox(height: theme.hp(3)),
+                      _buildQuickActions(
+                        theme,
+                        baseColor,
+                        shadowDark,
+                        shadowLight,
+                      ),
+                      SizedBox(height: theme.hp(3)),
+                      _buildTabBar(theme),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildTransactionsTab(
+                              theme,
+                              baseColor,
+                              shadowDark,
+                              shadowLight,
+                            ),
+                            _buildTicketsTab(
+                              theme,
+                              baseColor,
+                              shadowDark,
+                              shadowLight,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
         ),
       ),
     );
@@ -83,7 +188,7 @@ class _WalletScreenState extends State<WalletScreen>
   Widget _buildAppBar(AppTheme theme) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: theme.wp(4), // Adjust as needed
+        horizontal: theme.wp(4),
         vertical: theme.hp(1),
       ),
       child: Row(
@@ -118,9 +223,7 @@ class _WalletScreenState extends State<WalletScreen>
           ),
           Text('My Wallet', style: theme.subheadingStyle),
           GestureDetector(
-            onTap: () {
-              // Show wallet settings or history
-            },
+            onTap: _fetchWalletData,
             child: Container(
               padding: EdgeInsets.all(theme.wp(2)),
               decoration: BoxDecoration(
@@ -140,7 +243,7 @@ class _WalletScreenState extends State<WalletScreen>
                 ],
               ),
               child: Icon(
-                Icons.more_vert_rounded,
+                Icons.refresh_rounded,
                 color: theme.textPrimaryColor,
                 size: theme.wp(5),
               ),
@@ -188,42 +291,18 @@ class _WalletScreenState extends State<WalletScreen>
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Total Balance', style: theme.captionStyle),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showBalance = !_showBalance;
-                    });
-                  },
-                  child: Icon(
-                    _showBalance ? Icons.visibility_off : Icons.visibility,
-                    color: theme.textSecondaryColor,
-                    size: theme.wp(5),
-                  ),
-                ),
-              ],
+              children: [Text('Total Balance', style: theme.captionStyle)],
             ),
             SizedBox(height: theme.hp(1)),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  _showBalance ? '${widget.coins}' : '•••••',
+                  "₹$_coins",
                   style: GoogleFonts.poppins(
                     fontSize: theme.sp(10),
                     fontWeight: FontWeight.bold,
                     color: theme.textPrimaryColor,
-                  ),
-                ),
-                SizedBox(width: theme.wp(2)),
-                Padding(
-                  padding: EdgeInsets.only(bottom: theme.hp(1)),
-                  child: Text(
-                    'Coins',
-                    style: theme.bodyStyle.copyWith(
-                      color: theme.textSecondaryColor,
-                    ),
                   ),
                 ),
               ],
@@ -237,20 +316,20 @@ class _WalletScreenState extends State<WalletScreen>
                   baseColor,
                   shadowDark,
                   shadowLight,
-                  icon: Icons.confirmation_number_rounded,
+                  icon: Icons.trending_up_rounded,
                   title: 'Tickets',
-                  value: widget.tickets.toString(),
-                  iconColor: theme.accentColor,
+                  value: '$_tickets',
+                  iconColor: theme.successColor,
                 ),
                 _buildBalanceCard(
                   theme,
                   baseColor,
                   shadowDark,
                   shadowLight,
-                  icon: Icons.trending_up_rounded,
+                  icon: Icons.account_balance_wallet_rounded,
                   title: 'Winnings',
-                  value: '${widget.coins ~/ 10}',
-                  iconColor: theme.successColor,
+                  value: '${_coins ~/ 10}',
+                  iconColor: theme.infoColor,
                 ),
               ],
             ),
@@ -308,7 +387,7 @@ class _WalletScreenState extends State<WalletScreen>
               Text(title, style: theme.captionStyle),
               SizedBox(height: theme.hp(0.5)),
               Text(
-                _showBalance ? value : '•••',
+                value,
                 style: GoogleFonts.poppins(
                   fontSize: theme.sp(4.5),
                   fontWeight: FontWeight.bold,
@@ -342,9 +421,32 @@ class _WalletScreenState extends State<WalletScreen>
             label: 'Add Coins',
             color: theme.primaryColor,
             onTap: () {
-              // Add coins action
+              final userProvider = Provider.of<UserProvider>(
+                context,
+                listen: false,
+              );
+              final phone = userProvider.phoneNumber;
+
+              debugPrint("Phone before navigating: $phone");
+
+              if (phone != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => DepositScreen()),
+                ).then((_) => _fetchWalletData()); // Refresh after returning
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      "User not authenticated. Please log in again.",
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
           ),
+
           _buildActionButton(
             theme,
             baseColor,
@@ -355,6 +457,12 @@ class _WalletScreenState extends State<WalletScreen>
             color: theme.accentColor,
             onTap: () {
               // Buy tickets action
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("Coming soon!"),
+                  backgroundColor: theme.infoColor,
+                ),
+              );
             },
           ),
           _buildActionButton(
@@ -367,6 +475,12 @@ class _WalletScreenState extends State<WalletScreen>
             color: theme.infoColor,
             onTap: () {
               // Withdraw action
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("Withdrawal feature coming soon!"),
+                  backgroundColor: theme.infoColor,
+                ),
+              );
             },
           ),
         ],
@@ -457,52 +571,6 @@ class _WalletScreenState extends State<WalletScreen>
     Color shadowDark,
     Color shadowLight,
   ) {
-    final transactions =
-        widget.recentTransactions.isEmpty
-            ? [
-              Transaction(
-                id: '1',
-                type: TransactionType.deposit,
-                amount: 500,
-                date: DateTime.now().subtract(const Duration(days: 1)),
-                status: TransactionStatus.completed,
-                description: 'Added coins',
-              ),
-              Transaction(
-                id: '2',
-                type: TransactionType.gamePlay,
-                amount: -100,
-                date: DateTime.now().subtract(const Duration(days: 2)),
-                status: TransactionStatus.completed,
-                description: 'Game entry fee',
-              ),
-              Transaction(
-                id: '3',
-                type: TransactionType.reward,
-                amount: 250,
-                date: DateTime.now().subtract(const Duration(days: 3)),
-                status: TransactionStatus.completed,
-                description: 'Game winnings',
-              ),
-              Transaction(
-                id: '4',
-                type: TransactionType.purchase,
-                amount: -50,
-                date: DateTime.now().subtract(const Duration(days: 5)),
-                status: TransactionStatus.completed,
-                description: 'Purchased 5 tickets',
-              ),
-              Transaction(
-                id: '5',
-                type: TransactionType.withdrawal,
-                amount: -200,
-                date: DateTime.now().subtract(const Duration(days: 7)),
-                status: TransactionStatus.pending,
-                description: 'Withdrawal to bank account',
-              ),
-            ]
-            : widget.recentTransactions;
-
     return Padding(
       padding: EdgeInsets.only(top: theme.hp(2)),
       child: Column(
@@ -520,6 +588,12 @@ class _WalletScreenState extends State<WalletScreen>
                 TextButton(
                   onPressed: () {
                     // View all transactions
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Full transaction history coming soon!"),
+                        backgroundColor: theme.infoColor,
+                      ),
+                    );
                   },
                   child: Text(
                     'View All',
@@ -531,20 +605,41 @@ class _WalletScreenState extends State<WalletScreen>
           ),
           SizedBox(height: theme.hp(1)),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: theme.wp(5)),
-              itemCount: transactions.length,
-              itemBuilder: (context, index) {
-                final transaction = transactions[index];
-                return _buildTransactionItem(
-                  theme,
-                  baseColor,
-                  shadowDark,
-                  shadowLight,
-                  transaction,
-                );
-              },
-            ),
+            child:
+                _recentTransactions.isEmpty
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: theme.wp(15),
+                            color: theme.textSecondaryColor.withOpacity(0.5),
+                          ),
+                          SizedBox(height: theme.hp(2)),
+                          Text(
+                            'No transactions yet',
+                            style: theme.bodyStyle.copyWith(
+                              color: theme.textSecondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    : ListView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: theme.wp(5)),
+                      itemCount: _recentTransactions.length,
+                      itemBuilder: (context, index) {
+                        final transaction = _recentTransactions[index];
+                        return _buildTransactionItem(
+                          theme,
+                          baseColor,
+                          shadowDark,
+                          shadowLight,
+                          transaction,
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -686,34 +781,6 @@ class _WalletScreenState extends State<WalletScreen>
     Color shadowDark,
     Color shadowLight,
   ) {
-    // Sample ticket data
-    final tickets = [
-      Ticket(
-        id: '1',
-        gameId: 'G001',
-        purchaseDate: DateTime.now().subtract(const Duration(days: 1)),
-        expiryDate: DateTime.now().add(const Duration(days: 30)),
-        isUsed: false,
-        gameName: 'Mega Jackpot',
-      ),
-      Ticket(
-        id: '2',
-        gameId: 'G002',
-        purchaseDate: DateTime.now().subtract(const Duration(days: 3)),
-        expiryDate: DateTime.now().add(const Duration(days: 27)),
-        isUsed: false,
-        gameName: 'Lucky Draw',
-      ),
-      Ticket(
-        id: '3',
-        gameId: 'G001',
-        purchaseDate: DateTime.now().subtract(const Duration(days: 5)),
-        expiryDate: DateTime.now().add(const Duration(days: 25)),
-        isUsed: true,
-        gameName: 'Mega Jackpot',
-      ),
-    ];
-
     return Padding(
       padding: EdgeInsets.only(top: theme.hp(2)),
       child: Column(
@@ -731,6 +798,12 @@ class _WalletScreenState extends State<WalletScreen>
                 TextButton(
                   onPressed: () {
                     // Buy more tickets
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Ticket purchase coming soon!"),
+                        backgroundColor: theme.infoColor,
+                      ),
+                    );
                   },
                   child: Text(
                     'Buy More',
@@ -742,20 +815,65 @@ class _WalletScreenState extends State<WalletScreen>
           ),
           SizedBox(height: theme.hp(1)),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: theme.wp(5)),
-              itemCount: tickets.length,
-              itemBuilder: (context, index) {
-                final ticket = tickets[index];
-                return _buildTicketItem(
-                  theme,
-                  baseColor,
-                  shadowDark,
-                  shadowLight,
-                  ticket,
-                );
-              },
-            ),
+            child:
+                _userTickets.isEmpty
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.confirmation_number_outlined,
+                            size: theme.wp(15),
+                            color: theme.textSecondaryColor.withOpacity(0.5),
+                          ),
+                          SizedBox(height: theme.hp(2)),
+                          Text(
+                            'No tickets yet',
+                            style: theme.bodyStyle.copyWith(
+                              color: theme.textSecondaryColor,
+                            ),
+                          ),
+                          SizedBox(height: theme.hp(2)),
+                          ElevatedButton(
+                            onPressed: () {
+                              // Buy tickets action
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Ticket purchase coming soon!"),
+                                  backgroundColor: theme.infoColor,
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: theme.wp(5),
+                                vertical: theme.hp(1.5),
+                              ),
+                            ),
+                            child: Text(
+                              'Buy Tickets',
+                              style: theme.buttonTextStyle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    : ListView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: theme.wp(5)),
+                      itemCount: _userTickets.length,
+                      itemBuilder: (context, index) {
+                        final ticket = _userTickets[index];
+                        return _buildTicketItem(
+                          theme,
+                          baseColor,
+                          shadowDark,
+                          shadowLight,
+                          ticket,
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -888,6 +1006,12 @@ class _WalletScreenState extends State<WalletScreen>
                   ElevatedButton(
                     onPressed: () {
                       // Use ticket action
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Game play coming soon!"),
+                          backgroundColor: theme.infoColor,
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.primaryColor,
@@ -948,45 +1072,4 @@ class _WalletScreenState extends State<WalletScreen>
       ],
     );
   }
-}
-
-// Models for the wallet screen
-enum TransactionType { deposit, withdrawal, gamePlay, reward, purchase }
-
-enum TransactionStatus { completed, pending, failed }
-
-class Transaction {
-  final String id;
-  final TransactionType type;
-  final int amount;
-  final DateTime date;
-  final TransactionStatus status;
-  final String description;
-
-  Transaction({
-    required this.id,
-    required this.type,
-    required this.amount,
-    required this.date,
-    required this.status,
-    required this.description,
-  });
-}
-
-class Ticket {
-  final String id;
-  final String gameId;
-  final DateTime purchaseDate;
-  final DateTime expiryDate;
-  final bool isUsed;
-  final String gameName;
-
-  Ticket({
-    required this.id,
-    required this.gameId,
-    required this.purchaseDate,
-    required this.expiryDate,
-    required this.isUsed,
-    required this.gameName,
-  });
 }

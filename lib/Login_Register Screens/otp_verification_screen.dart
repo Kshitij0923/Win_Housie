@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 import 'package:tambola/Provider/Controller/api_provider.dart';
+import 'package:tambola/Provider/Controller/user_provider.dart';
 import 'package:tambola/Screens/Admin%20Screens/admin_dashboard.dart';
 import 'package:tambola/Screens/home_page.dart';
 import 'package:tambola/Theme/app_theme.dart';
@@ -161,49 +160,105 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     setState(() => _isLoading = true);
     final otp = _otpControllers.map((controller) => controller.text).join();
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // Check if this is admin login
+    if (widget.phoneNumber == '9326977987') {
+      try {
+        // For admin, we can either verify OTP normally or use a simpler verification
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    final result = await authProvider.verifyOtpRequest(
-      phone: widget.phoneNumber,
-      otp: otp,
-      name: widget.username,
-    );
+        // Verify OTP normally for admin
+        final result = await authProvider.verifyOtpRequest(
+          phone: widget.phoneNumber,
+          otp: otp,
+          name: 'Admin',
+        );
 
-    if (result['success']) {
-      final data = result['data'];
-      final userData = data['user'];
-      final accessToken = data['accessToken'];
+        if (result['success']) {
+          // Save admin data
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isLoggedIn', true);
+          await prefs.setString('phone_number', widget.phoneNumber);
+          await prefs.setString('username', 'Admin');
+          await prefs.setString('user_role', 'admin');
 
-      await saveUserData(
-        phoneNumber: userData['phone'].toString(),
-        username: userData['name'].toString(),
-        authToken: accessToken.toString(),
-      );
-
-      // Check user role
-      final role = userData['role']; // Assuming 'role' is in the user data
-      debugPrint('User Role: $role');
-
-      if (mounted) {
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        // Navigate based on the role
-        if (role == 'admin') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => AdminDashboard()),
+          // Update UserProvider with admin data
+          await userProvider.saveUserData(
+            phoneNumber: widget.phoneNumber,
+            username: 'Admin',
+            authToken:
+                result['data']['accessToken']?.toString() ?? 'admin_token',
+            refreshToken: result['data']['refreshToken']?.toString() ?? '',
           );
+
+          if (mounted) {
+            await Future.delayed(const Duration(milliseconds: 300));
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => AdminDashboard()),
+            );
+          }
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => HousieeGameApp()),
-          );
-          debugPrint('Unknown user role: $e');
+          if (mounted) {
+            _showErrorSnackBar(
+              result['message'] ?? 'Admin verification failed',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Admin OTP verification error: $e');
+        if (mounted) {
+          _showErrorSnackBar('Admin verification failed: ${e.toString()}');
         }
       }
     } else {
-      if (mounted) {
-        _showErrorSnackBar(result['message'] ?? 'Verification failed');
+      // Regular user OTP verification
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+      final result = await authProvider.verifyOtpRequest(
+        phone: widget.phoneNumber,
+        otp: otp,
+        name: widget.username,
+      );
+
+      if (result['success']) {
+        final data = result['data'];
+        final userData = data['user'];
+        final accessToken = data['accessToken'];
+
+        debugPrint("Calling saveUserData...");
+        // Save user data using UserProvider
+        await userProvider.saveUserData(
+          phoneNumber: userData['phone'].toString(),
+          username: userData['name'].toString(),
+          authToken: accessToken.toString(),
+          refreshToken: '', // Optional if not using
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', true);
+
+        debugPrint('User Role: ${userData['role']}');
+        if (mounted) {
+          await Future.delayed(const Duration(milliseconds: 300));
+          final role = userData['role'];
+          if (role == 'admin') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => AdminDashboard()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HousieeGameApp()),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          _showErrorSnackBar(result['message'] ?? 'Verification failed');
+        }
       }
     }
 
@@ -223,39 +278,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
         duration: Duration(seconds: 3),
       ),
     );
-  }
-
-  Future<void> saveUserData({
-    required String phoneNumber,
-    required String username,
-    required String authToken,
-    //required String userId,
-  }) async {
-    await _initPrefs();
-
-    if (_prefs != null) {
-      try {
-        // Save phone and username
-        final phoneSaved = await _prefs!.setString(KEY_PHONE, phoneNumber);
-        final usernameSaved = await _prefs!.setString(KEY_USERNAME, username);
-        // final userIdSaved = await _prefs!.setString(KEY_USER_ID, userId);
-        final tokenSaved = await _prefs!.setString(KEY_AUTH_TOKEN, authToken);
-        final authSaved = await _prefs!.setBool(KEY_IS_AUTHENTICATED, true);
-
-        if (!phoneSaved || !usernameSaved || !tokenSaved || !authSaved) {
-          debugPrint('Failed to save user data');
-          throw Exception('Failed to save data');
-        }
-
-        debugPrint('User data saved successfully.');
-        debugPrint('Authentication state set to TRUE');
-      } catch (e) {
-        debugPrint('Storage error: $e');
-        throw Exception('Failed to save user data: $e');
-      }
-    } else {
-      debugPrint('SharedPreferences not initialized.');
-    }
   }
 
   Future<void> _resendOtp() async {

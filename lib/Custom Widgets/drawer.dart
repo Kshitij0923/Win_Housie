@@ -1,32 +1,84 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:tambola/Screens/ticket_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tambola/Login_Register%20Screens/login_screen.dart';
+import 'package:tambola/Provider/Controller/user_provider.dart';
+import 'package:tambola/Screens/contest_screen.dart';
+import 'package:tambola/Screens/mega_screen.dart';
+import 'package:tambola/Screens/myProfile.dart';
+import 'package:tambola/Screens/settings_screen.dart';
 import 'package:tambola/Screens/wallet_screen.dart';
 import 'package:tambola/Theme/app_theme.dart';
 
-class NeumorphicHousieeDrawer extends StatelessWidget {
-  final String username;
-  final String email;
+class NeumorphicHousieeDrawer extends StatefulWidget {
   final String avatarUrl;
   final int coins;
   final int tickets;
 
   const NeumorphicHousieeDrawer({
     super.key,
-    this.username = "Player",
-    this.email = "player@example.com",
     this.avatarUrl = "",
     this.coins = 0,
     this.tickets = 0,
   });
 
   @override
+  State<NeumorphicHousieeDrawer> createState() =>
+      _NeumorphicHousieeDrawerState();
+}
+
+File? _profileImage;
+String? _email;
+bool _isLoading = true;
+
+class _NeumorphicHousieeDrawerState extends State<NeumorphicHousieeDrawer> {
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Get profile image path from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final imagePath = prefs.getString('profile_image_path');
+      final email =
+          prefs.getString('email') ??
+          'user@example.com'; // Get email from SharedPreferences
+
+      setState(() {
+        if (imagePath != null && File(imagePath).existsSync()) {
+          _profileImage = File(imagePath);
+        } else {
+          _profileImage = null;
+        }
+        _email = email;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading profile data: $e');
+      setState(() {
+        _isLoading = false;
+        _email = 'user@example.com'; // Default email in case of error
+      });
+    }
+  }
+
   Widget build(BuildContext context) {
     final theme = AppTheme();
     final Color baseColor = theme.cardColor;
     final Color shadowDark = Colors.black;
     final Color shadowLight = theme.primaryColor.withValues(alpha: 0.3);
     final Color highlightColor = theme.primaryColor;
+    final userProvider = Provider.of<UserProvider>(context);
 
     return Drawer(
       backgroundColor: theme.backgroundColor,
@@ -35,7 +87,14 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              _buildHeader(context, theme, baseColor, shadowDark, shadowLight),
+              _buildHeader(
+                context,
+                theme,
+                baseColor,
+                shadowDark,
+                shadowLight,
+                userProvider,
+              ),
               SizedBox(height: theme.hp(2)),
               _buildBalanceInfo(
                 context,
@@ -71,7 +130,12 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                       shadowLight: shadowLight,
                       highlightColor: highlightColor,
                       onTap: () {
-                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => HouzieeProfileScreen(),
+                          ),
+                        );
                         // Navigate to profile
                       },
                     ),
@@ -79,14 +143,19 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                     _buildNeumorphicMenuItem(
                       context: context,
                       icon: Icons.history_rounded,
-                      title: 'Game History',
+                      title: 'Wallet',
                       theme: theme,
                       baseColor: baseColor,
                       shadowDark: shadowDark,
                       shadowLight: shadowLight,
                       highlightColor: highlightColor,
                       onTap: () {
-                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WalletScreen(),
+                          ),
+                        );
                         // Navigate to game history
                       },
                     ),
@@ -119,7 +188,7 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const MyTicketsScreen(),
+                            builder: (context) => const MegaScreen(contest: {}),
                           ),
                         );
                         // Navigate to ticket purchase
@@ -129,7 +198,7 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                     _buildNeumorphicMenuItem(
                       context: context,
                       icon: Icons.attach_money_rounded,
-                      title: 'Add Coins',
+                      title: 'Game History',
                       theme: theme,
                       baseColor: baseColor,
                       shadowDark: shadowDark,
@@ -156,8 +225,12 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                       shadowLight: shadowLight,
                       highlightColor: highlightColor,
                       onTap: () {
-                        Navigator.pop(context);
-                        // Navigate to settings
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SettingsScreen(),
+                          ),
+                        );
                       },
                     ),
                     SizedBox(height: theme.hp(2)),
@@ -201,7 +274,16 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
     Color baseColor,
     Color shadowDark,
     Color shadowLight,
+    UserProvider userProvider,
   ) {
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: theme.primaryColor),
+      );
+    }
+
+    final username = userProvider.username ?? 'User';
+
     return Padding(
       padding: EdgeInsets.all(theme.wp(5)),
       child: Column(
@@ -237,24 +319,33 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                     ),
                   ],
                 ),
-                child:
-                    avatarUrl.isNotEmpty
-                        ? ClipRRect(
-                          borderRadius: BorderRadius.circular(theme.wp(9)),
-                          child: Image.network(avatarUrl, fit: BoxFit.cover),
-                        )
-                        : Center(
-                          child: Text(
-                            username.isNotEmpty
-                                ? username[0].toUpperCase()
-                                : "P",
-                            style: GoogleFonts.poppins(
-                              color: theme.textPrimaryColor,
-                              fontSize: theme.sp(8),
-                              fontWeight: FontWeight.bold,
+                child: ClipOval(
+                  child:
+                      _profileImage != null
+                          ? Image.file(
+                            _profileImage!,
+                            width: 30,
+                            height: 30,
+                            fit: BoxFit.cover,
+                          )
+                          : Container(
+                            width: 30,
+                            height: 30,
+                            color: Colors.purple[300],
+                            child: Center(
+                              child: Text(
+                                username.isNotEmpty
+                                    ? username[0].toUpperCase()
+                                    : "U",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                ),
               ),
               SizedBox(width: theme.wp(5)),
               // User info
@@ -262,24 +353,12 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(username, style: theme.subheadingStyle),
-                    SizedBox(height: theme.hp(0.5)),
-                    Text(email, style: theme.captionStyle),
-                    SizedBox(height: theme.hp(1.5)),
-                    // Edit profile button
-                    _buildNeumorphicButton(
-                      context,
-                      'Edit Profile',
-                      icon: Icons.edit,
-                      isSmall: true,
-                      theme: theme,
-                      baseColor: baseColor,
-                      shadowDark: shadowDark,
-                      shadowLight: shadowLight,
-                      onTap: () {
-                        // Edit profile action
-                      },
+                    SizedBox(height: theme.hp(2.5)),
+                    Text(
+                      username,
+                      style: theme.headingStyle.copyWith(fontSize: theme.sp(6)),
                     ),
+                    SizedBox(height: theme.hp(1.5)),
                   ],
                 ),
               ),
@@ -349,7 +428,7 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                     ),
                     SizedBox(width: theme.wp(2)),
                     Text(
-                      '$coins',
+                      '${widget.coins}',
                       style: GoogleFonts.poppins(
                         color: theme.textPrimaryColor,
                         fontSize: theme.sp(4.5),
@@ -369,7 +448,7 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const MyTicketsScreen(),
+                    builder: (context) => const HousieContestScreen(),
                   ),
                 );
               },
@@ -412,7 +491,7 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
                     ),
                     SizedBox(width: theme.wp(2)),
                     Text(
-                      '$tickets',
+                      '${widget.tickets}',
                       style: GoogleFonts.poppins(
                         color: theme.textPrimaryColor,
                         fontSize: theme.sp(4.5),
@@ -579,7 +658,12 @@ class NeumorphicHousieeDrawer extends StatelessWidget {
   ) {
     return InkWell(
       onTap: () {
-        // Logout action
+        // Handle logout logic here
+        Provider.of<UserProvider>(context, listen: false).logout();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
       },
       borderRadius: theme.buttonBorderRadius,
       child: Container(

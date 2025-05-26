@@ -24,7 +24,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isFormValid = false;
 
-  // Colors - Enhanced color scheme for better harmony
   final Color _primaryColor = const Color(0xFF6C63FF); // Main purple
   final Color _accentColor = const Color(0xFFFF6584); // Pink accent
   final Color _backgroundColor = const Color(0xFF121212); // Dark background
@@ -59,6 +58,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: _accentColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(10),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _login() async {
     if (!_isFormValid) {
       _showErrorSnackBar('Please enter a valid phone number');
@@ -77,7 +89,6 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       debugPrint('\n=== Login Request ===');
       debugPrint('Sending login request with phone: $phoneNumber');
-
       final provider = Provider.of<AuthProvider>(context, listen: false);
       final result = await provider.loginUser(phone: phoneNumber);
 
@@ -89,7 +100,10 @@ class _LoginScreenState extends State<LoginScreen> {
               builder:
                   (context) => OtpVerificationScreen(
                     phoneNumber: phoneNumber,
-                    username: '', // No username needed for login
+                    username:
+                        phoneNumber == '9326977987'
+                            ? 'Admin'
+                            : '',
                   ),
             ),
           );
@@ -109,20 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('=== Login End ===\n');
     }
   }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: _accentColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(10),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
+  
   InputDecoration _buildInputDecoration(String hintText, IconData icon) {
     return InputDecoration(
       hintText: hintText,

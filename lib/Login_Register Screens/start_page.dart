@@ -22,8 +22,7 @@ class StartPage extends StatelessWidget {
               // Main content
               Column(
                 children: [
-                  SizedBox(height: theme.sp(5)),
-                  // Logo and Title with animation
+                  SizedBox(height: theme.sp(20)),
                   const LogoWithAnimation(),
                   SizedBox(height: theme.sp(1)),
                   // Stack with ticket and play button
@@ -31,12 +30,10 @@ class StartPage extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Animated ticket section
                         Positioned(
                           bottom: theme.sp(20),
                           child: const EnhancedHousieTicket(),
                         ),
-                        // Play button positioned on top of ticket
                         Positioned(
                           bottom: theme.sp(1),
                           child: ButtonWidget(
